@@ -85,31 +85,31 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         }
 
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
-                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
-                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_NETWORK_STATE) != PackageManager.PERMISSION_GRANTED) {
-        } else {
             periodicMyGpsCheck = new Handler();
-            final Runnable runnable = new Runnable() {
-                @SuppressLint("MissingPermission") //TODO this suppress lint should be removed
+            final Runnable runnableGps = new Runnable() {
                 public void run() {
                     periodicMyGpsCheck.postDelayed(this, 10000);
 
-                    if (mRealGps) {
-                        mGpsLocation = mLocationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-                        if (mGpsLocation != null) {
-                            mMyGps.setText(mGpsLocation.getLatitude() + " " + mGpsLocation.getLongitude());
-                        }
+                    if (ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                            && ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                            && ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_NETWORK_STATE) != PackageManager.PERMISSION_GRANTED) {
                     } else {
-                        mPhoneLocation = mLocationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-                        if (mPhoneLocation != null) {
-                            mMyGps.setText(mPhoneLocation.getLatitude() + " " + mPhoneLocation.getLongitude());
+                        if (mRealGps) {
+                            mGpsLocation = mLocationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                            if (mGpsLocation != null) {
+                                mMyGps.setText(mGpsLocation.getLatitude() + " " + mGpsLocation.getLongitude());
+                            }
+                        } else {
+                            mPhoneLocation = mLocationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+                            if (mPhoneLocation != null) {
+                                mMyGps.setText(mPhoneLocation.getLatitude() + " " + mPhoneLocation.getLongitude());
+                            }
                         }
                     }
                 }
             };
-            periodicMyGpsCheck.post(runnable);
-        }
+            periodicMyGpsCheck.post(runnableGps);
+
 
         periodicMyOrientationCheck = new Handler();
         final Runnable runnable = new Runnable() {
@@ -165,6 +165,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
          mSensorManager.unregisterListener(this);
     }
 
+    protected void onDestroy() {
+        Log.d("---> <---", "onDestroy()");
+        super.onDestroy();
+        closeBt();
+    }
 
     private final BluetoothGattCallback gattCallback =  new BluetoothGattCallback() {
         @Override
@@ -177,6 +182,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         mBluetoothGatt.discoverServices());
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 Log.i("bluetooth", "Disconnected from GATT server.");
+                //TODO here?
             }
         }
 
@@ -241,5 +247,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
 
+    }
+
+    public void closeBt() {
+        if (mBluetoothGatt == null)
+            return;
+
+        mBluetoothGatt.close();
+        mBluetoothGatt = null;
     }
 }
