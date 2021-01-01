@@ -31,6 +31,7 @@ public class BluetoothPairing extends AppCompatActivity implements View.OnClickL
     private RadioGroup mRadioGroup;
     private ArrayList<BluetoothDevice> mLeDevices;
     private Button buttonOk;
+    private RadioGroup mRadioGroupGps;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,7 +42,7 @@ public class BluetoothPairing extends AppCompatActivity implements View.OnClickL
         buttonPrevious.setOnClickListener(BluetoothPairing.this);
         buttonOk.setOnClickListener(BluetoothPairing.this);
         mRadioGroup = (RadioGroup) findViewById(R.id.radioGroup);
-
+        mRadioGroupGps = (RadioGroup) findViewById(R.id.radioGroup3);
         mTextView = findViewById(R.id.textView);
 
         final BluetoothManager bluetoothManager =
@@ -90,31 +91,37 @@ public class BluetoothPairing extends AppCompatActivity implements View.OnClickL
     @Override
     public void onClick(View v) {
         mBluetoothLeScanner.stopScan(leScanCallback);
+
+        Intent intent = new Intent(this, MainActivity.class);
         switch (v.getId()) {
-            case R.id.button2:
-                Intent intent = new Intent(this, MainActivity.class);
-                startActivity(intent);
-                break;
             case R.id.button3:
                 int selectedId = mRadioGroup.getCheckedRadioButtonId();
+                int selectedGpsId = mRadioGroupGps.getCheckedRadioButtonId();
                 RadioButton selectedButton = (RadioButton) findViewById(selectedId);
-                if (selectedButton == null) {
-                    intent = new Intent(this, MainActivity.class);
-                    startActivity(intent);
-                } else {
+                RadioButton selectedGpsButton = (RadioButton) findViewById(selectedGpsId);
+
+                if (selectedButton != null) {
                     CharSequence buttonText = selectedButton.getText();
                     StringTokenizer tokenizer =  new StringTokenizer((String) buttonText);
                     CharSequence address = tokenizer.nextToken();
                     for (BluetoothDevice device : mLeDevices) {
                         if (device.getAddress().equalsIgnoreCase((String) address)) {
                             mTextView.setText(device.getAddress() + "@" + device.getName());
-                            intent = new Intent(this, MainActivity.class);
                             intent.putExtra("bluetooth", device);
-                            startActivity(intent);
                         }
                     }
                 }
+
+                if (selectedGpsButton != null) {
+                    CharSequence text = selectedGpsButton.getText();
+                    if (text.equals("Network"))
+                        intent.putExtra("realgps", false);
+                    else
+                        intent.putExtra("realgps", true);
+
+                }
             default:
         }
+        startActivity(intent);
     }
 };
