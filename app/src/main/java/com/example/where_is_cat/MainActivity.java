@@ -1,10 +1,13 @@
 package com.example.where_is_cat;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.Service;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
@@ -13,15 +16,18 @@ import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothProfile;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.location.Location;
+import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.IBinder;
 import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
@@ -43,7 +49,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private Handler periodicMyOrientationCheck;
     private Location mGpsLocation;
     private Location mPhoneLocation;
-    private LocationManager mLocationManager;
     private BluetoothDevice mBluetoothDevice;
     private BluetoothGatt mBluetoothGatt;
     private List<BluetoothGattService> mServices;
@@ -53,8 +58,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private float mCurrentDegree;
     private ImageView mArrow;
     private boolean mRealGps;
+    private TextView mDistance;
+    private double mMyLatitude;
+    private double mMyLongitude;
+    private double mCatsLatitude;
+    private double mCatsLongitude;
+    private GPSTracker mGpsTracker;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        Log.d("---> <---", "onCreate()");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -70,8 +82,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mMagnetometerReading = new float[3];
         mArrow = (ImageView) findViewById(R.id.imageView);
         mCurrentDegree = 0;
+        mDistance = (TextView) findViewById(R.id.textView11);
+        mCatsLatitude = (float) 52.1783439;
+        mCatsLongitude = (float) 21.0571029;
 
-        mLocationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
 
         mRealGps = false;
@@ -79,42 +93,47 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         Intent intent = getIntent();
         Bundle extras = intent.getExtras();
 
-        if (intent != null && extras != null) {
+        SharedPreferences sharedPreferences = getSharedPreferences("where-is-cat", MODE_PRIVATE);
+
+        if (extras != null) {
             if (extras.containsKey("realgps")) {
                 mRealGps = extras.getBoolean("realgps");
             }
+        } else {
+            mRealGps = sharedPreferences.getBoolean("gps", false);
         }
 
-            periodicMyGpsCheck = new Handler();
-            final Runnable runnableGps = new Runnable() {
-                public void run() {
-                    periodicMyGpsCheck.postDelayed(this, 10000);
+        periodicMyGpsCheck = new Handler();
+        final Runnable runnableGps = new Runnable() {
+            public void run() {
+                periodicMyGpsCheck.postDelayed(this, 1000);
+                Location location;
 
-                    if (ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
-                            && ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
-                            && ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_NETWORK_STATE) != PackageManager.PERMISSION_GRANTED) {
-                    } else {
-                        if (mRealGps) {
-                            mGpsLocation = mLocationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-                            if (mGpsLocation != null) {
-                                mMyGps.setText(mGpsLocation.getLatitude() + " " + mGpsLocation.getLongitude());
-                            }
-                        } else {
-                            mPhoneLocation = mLocationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-                            if (mPhoneLocation != null) {
-                                mMyGps.setText(mPhoneLocation.getLatitude() + " " + mPhoneLocation.getLongitude());
-                            }
-                        }
-                    }
+                if (mRealGps)
+                    location = mGpsTracker.GetGpsLocation();
+                else
+                    location = mGpsTracker.GetNetworkLocation();
+
+                if (location != null) {
+                    String mode;
+                    if (mRealGps)
+                        mode = "RealGPS";
+                    else
+                        mode = "Network";
+
+                    mMyLatitude = location.getLatitude();
+                    mMyLongitude = location.getLongitude();
+                    mDistance.setText(Double.toString(calculateDistance(mMyLatitude, mMyLongitude, mCatsLatitude, mCatsLongitude)));
+                    mMyGps.setText(Double.toString(mMyLatitude) + " " + Double.toString(mMyLongitude) + " [" + mode + "]");
                 }
-            };
-            periodicMyGpsCheck.post(runnableGps);
-
+            }
+        };
+        periodicMyGpsCheck.post(runnableGps);
 
         periodicMyOrientationCheck = new Handler();
         final Runnable runnable = new Runnable() {
             public void run() {
-                periodicMyOrientationCheck.postDelayed(this, 1000);
+                periodicMyOrientationCheck.postDelayed(this, 200);
                 // Rotation matrix based on current readings from accelerometer and magnetometer.
                 final float[] rotationMatrix = new float[9];
                 mSensorManager.getRotationMatrix(rotationMatrix, null,
@@ -129,23 +148,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     azimuth += 360;
 
                 mMyOrientation.setText(Float.toString(azimuth));
-
-                mArrow.setRotation(-azimuth);
+                int bearing = (int) calculateBearing(mMyLatitude, mMyLongitude, mCatsLatitude, mCatsLongitude);
+                mArrow.setRotation(-azimuth + bearing);
             }
         };
         periodicMyOrientationCheck.post(runnable);
-
-        if (intent != null) {
-            if (extras != null && extras.containsKey("bluetooth")) {
-                mBluetoothDevice = intent.getParcelableExtra("bluetooth");
-                mBluetoothTextView.setText(mBluetoothDevice.getAddress() + " " + mBluetoothDevice.getName());
-                mBluetoothGatt = mBluetoothDevice.connectGatt(this, true, gattCallback);
-            }
-        }
     }
 
     protected void onResume() {
          super.onResume();
+         Log.d("---> <---", "onResume()");
          if (mSensorManager != null) {
              Sensor accelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
              if (accelerometer != null) {
@@ -158,17 +170,32 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                          SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
              }
        }
+        mGpsTracker = new GPSTracker(this);
+
+        Intent intent = getIntent();
+        Bundle extras = intent.getExtras();
+        if (intent != null) {
+            if (extras != null && extras.containsKey("bluetooth")) {
+                mBluetoothDevice = intent.getParcelableExtra("bluetooth");
+                mBluetoothTextView.setText(mBluetoothDevice.getAddress() + " " + mBluetoothDevice.getName());
+                mBluetoothGatt = mBluetoothDevice.connectGatt(this, true, gattCallback);
+            }
+        }
+
     }
 
     protected void onPause() {
+        Log.d("---> <---", "onPause()");
          super.onPause();
          mSensorManager.unregisterListener(this);
+        closeBt();
+        mGpsTracker.closeGps();
     }
 
     protected void onDestroy() {
         Log.d("---> <---", "onDestroy()");
         super.onDestroy();
-        closeBt();
+
     }
 
     private final BluetoothGattCallback gattCallback =  new BluetoothGattCallback() {
@@ -211,6 +238,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         public void onCharacteristicChanged(BluetoothGatt gatt,
                                             BluetoothGattCharacteristic characteristic) {
             mCatGps.setText(characteristic.getStringValue(0));
+            Log.d("---> bt <---", characteristic.getStringValue(0));
         }
 
 
@@ -256,4 +284,89 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mBluetoothGatt.close();
         mBluetoothGatt = null;
     }
+
+    private double calculateDistance(double myLatitude, double myLongitude, double catsLatitude, double catsLongitude) {
+        double earthRadiusM = 6378137;
+        double dLatitudeRadians = Math.toRadians(catsLatitude - myLatitude);
+        double dLongitudeRadians = Math.toRadians(catsLongitude - myLongitude);
+        double myLatitudeRadians = Math.toRadians(myLatitude);
+        double catsLatitudeRadians = Math.toRadians(catsLatitude);
+        double a = Math.sin(dLatitudeRadians / 2) * Math.sin(dLatitudeRadians / 2) +
+                Math.sin(dLongitudeRadians / 2) * Math.sin(dLongitudeRadians / 2) *
+                        Math.cos(myLatitudeRadians) * Math.cos(catsLatitudeRadians);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return earthRadiusM * c;
+    }
+
+    private int calculateBearing(double myLatitude, double myLongitude, double catsLatitude, double catsLongitude) {
+        double teta1 = Math.toRadians(myLatitude);
+        double teta2 = Math.toRadians(catsLatitude);
+        double delta2 =  Math.toRadians(catsLongitude - myLongitude);
+        double y = Math.sin(delta2) * Math.cos(teta2);
+        double x = Math.cos(teta1) * Math.sin(teta2) - Math.sin(teta1) * Math.cos(teta2) * Math.cos(delta2);
+        double bearing = Math.atan2(y, x);
+        bearing = Math.toDegrees(bearing);
+        return((int) bearing) + 360 % 360;
+    }
+
+    public class GPSTracker extends Service implements LocationListener {
+        private LocationManager mLocationManager;
+        private Context mContext;
+        private Location mGpsLocation;
+        private Location mNetworkLocation;
+
+        public Location GetGpsLocation() { return mGpsLocation; }
+        public Location GetNetworkLocation() { return mNetworkLocation; }
+        public void closeGps() {
+            mLocationManager.removeUpdates(this);
+        }
+        GPSTracker(Context context) {
+
+            if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                    && ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                    && ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_NETWORK_STATE) != PackageManager.PERMISSION_GRANTED) {
+                return;
+            }
+
+            mContext = context;
+            mLocationManager = (LocationManager) mContext.getSystemService(LOCATION_SERVICE);
+
+            boolean isGpsEnabled = mLocationManager.isProviderEnabled(mLocationManager.GPS_PROVIDER);
+            boolean isNetworkEnabled = mLocationManager.isProviderEnabled(mLocationManager.NETWORK_PROVIDER);
+            if (isGpsEnabled) {
+                mLocationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 0, this);
+            }
+
+            if (isNetworkEnabled) {
+                mLocationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000, 0, this);
+            }
+
+        }
+
+        @Override
+        public void onLocationChanged(@NonNull Location location) {
+            Log.d("---> <---", location.toString());
+            if (location.getProvider().equals(mLocationManager.GPS_PROVIDER)) {
+                mGpsLocation = location;
+            } else {
+                mNetworkLocation = location;
+            }
+        }
+
+        @Override
+        public void onProviderEnabled(@NonNull String provider) {
+            Log.d("---> <---", provider);
+        }
+
+        @Override
+        public void onProviderDisabled(@NonNull String provider) {
+            Log.d("---> <---", provider);
+        }
+
+        @Nullable
+        @Override
+        public IBinder onBind(Intent intent) {
+            return null;
+        }
+    };
 }

@@ -10,8 +10,11 @@ import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanResult;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
+import android.preference.PreferenceManager;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -22,7 +25,7 @@ import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.StringTokenizer;
 
-public class BluetoothPairing extends AppCompatActivity implements View.OnClickListener {
+public class BluetoothPairing<onSaveInstanceState> extends AppCompatActivity implements View.OnClickListener {
     private Button buttonPrevious;
     private TextView mTextView;
     private BluetoothAdapter mBluetoothAdapter;
@@ -44,6 +47,14 @@ public class BluetoothPairing extends AppCompatActivity implements View.OnClickL
         mRadioGroup = (RadioGroup) findViewById(R.id.radioGroup);
         mRadioGroupGps = (RadioGroup) findViewById(R.id.radioGroup3);
         mTextView = findViewById(R.id.textView);
+
+        RadioButton button = findViewById(R.id.radioButton3);
+        SharedPreferences sharedPreferences = getSharedPreferences("where-is-cat", MODE_PRIVATE);
+        if (sharedPreferences.getBoolean("gps", false)) {
+            button.setChecked(true);
+        } else {
+            button.setChecked(false);
+        }
 
         final BluetoothManager bluetoothManager =
                 (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
@@ -113,13 +124,20 @@ public class BluetoothPairing extends AppCompatActivity implements View.OnClickL
                 }
 
                 if (selectedGpsButton != null) {
-                    CharSequence text = selectedGpsButton.getText();
-                    if (text.equals("Network"))
-                        intent.putExtra("realgps", false);
-                    else
-                        intent.putExtra("realgps", true);
+                    SharedPreferences sharedPreferences = getSharedPreferences("where-is-cat", MODE_PRIVATE);
+                    SharedPreferences.Editor shEditor = sharedPreferences.edit();
 
+                    CharSequence text = selectedGpsButton.getText();
+                    if (text.equals("Network")) {
+                        intent.putExtra("realgps", false);
+                        shEditor.putBoolean("gps", false);
+                    } else {
+                        intent.putExtra("realgps", true);
+                        shEditor.putBoolean("gps", true);
+                    }
+                    shEditor.commit();
                 }
+
             default:
         }
         startActivity(intent);
