@@ -64,9 +64,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private double mCatsLatitude;
     private double mCatsLongitude;
     private GPSTracker mGpsTracker;
+    private int mCommandState;
+    private String mString;
+    private char mChecksum;
+    private char mChecksumSent;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         Log.d("---> <---", "onCreate()");
+        mCommandState = 0;
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -108,7 +114,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             public void run() {
                 periodicMyGpsCheck.postDelayed(this, 1000);
                 Location location;
-
                 if (mRealGps)
                     location = mGpsTracker.GetGpsLocation();
                 else
@@ -233,12 +238,56 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         }
 
+        private double calculateLatLon(String value) {
+            double f = Double.parseDouble(value);
+            int firstTwoDigits = ((int) f) / 100;
+            double nextTwoDigits = f - (double) (firstTwoDigits * 100);
+            double finalAnswer = (double)firstTwoDigits + nextTwoDigits / 60.0;
+            return finalAnswer;
+        }
         @Override
         // Characteristic notification
         public void onCharacteristicChanged(BluetoothGatt gatt,
                                             BluetoothGattCharacteristic characteristic) {
-            mCatGps.setText(characteristic.getStringValue(0));
-            Log.d("---> bt <---", characteristic.getStringValue(0));
+            String character = characteristic.getStringValue(0);
+            if (character == null)
+                return;
+
+            if (mCommandState == 0) {
+                if (character.equals("*")) {
+                    mChecksumSent = 0;
+                    mCommandState = 1;
+                    String[] arrOfStr = mString.split(",", 0);
+                    if (arrOfStr != null && arrOfStr[1] != null)
+                        mCatsLatitude = calculateLatLon(arrOfStr[1]);
+                    if (arrOfStr != null && arrOfStr[3] != null)
+                        mCatsLongitude = calculateLatLon(arrOfStr[3]);
+                } else {
+                    mString += character;
+                    if (character.equals("$"))
+                        mChecksum = 0;
+                    else {
+                        int part = character.charAt(0);
+                        mChecksum = (char) (mChecksum ^ (char) part);
+                    }
+                }
+            } else {
+                mCommandState++;
+                int checksumPart =  Integer.valueOf(character, 16);
+                mChecksumSent = (char) ((mChecksumSent << 4) | checksumPart);
+
+
+
+                if (mCommandState == 3) {
+                    if (mChecksum == mChecksumSent)
+                        mCatGps.setText(Double.toString(mCatsLatitude) + " " + Double.toString(mCatsLongitude));
+                    else
+                        mCatGps.setText("Wrong checksum");
+                    mCommandState = 0;
+                    mString = "";
+                }
+            }
+
         }
 
 
