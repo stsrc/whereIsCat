@@ -36,6 +36,7 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import java.text.DecimalFormat;
 import java.util.List;
 import java.util.UUID;
 
@@ -63,6 +64,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private double mMyLongitude;
     private double mCatsLatitude;
     private double mCatsLongitude;
+    private double mCatsLatitudePrevious;
+    private double mCatsLongitudePrevious;
     private GPSTracker mGpsTracker;
     private int mCommandState;
     private String mString;
@@ -89,8 +92,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mArrow = (ImageView) findViewById(R.id.imageView);
         mCurrentDegree = 0;
         mDistance = (TextView) findViewById(R.id.textView11);
-        mCatsLatitude = (float) 52.1783439;
-        mCatsLongitude = (float) 21.0571029;
 
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
 
@@ -128,7 +129,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                     mMyLatitude = location.getLatitude();
                     mMyLongitude = location.getLongitude();
-                    mDistance.setText(Double.toString(calculateDistance(mMyLatitude, mMyLongitude, mCatsLatitude, mCatsLongitude)));
+
+                    if (mCatsLatitude != 0.0 && mCatsLongitude != 0.0) {
+                        double result = calculateDistance(mMyLatitude, mMyLongitude, mCatsLatitude, mCatsLongitude);
+                        DecimalFormat df2 = new DecimalFormat("#.##");
+                        mDistance.setText(df2.format(result));
+                    }
                     mMyGps.setText(Double.toString(mMyLatitude) + " " + Double.toString(mMyLongitude) + " [" + mode + "]");
                 }
             }
@@ -258,10 +264,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     mChecksumSent = 0;
                     mCommandState = 1;
                     String[] arrOfStr = mString.split(",", 0);
-                    if (arrOfStr != null && arrOfStr[1] != null)
+                    if (arrOfStr != null && arrOfStr[1] != null) {
+                        mCatsLatitudePrevious = mCatsLatitude;
                         mCatsLatitude = calculateLatLon(arrOfStr[1]);
-                    if (arrOfStr != null && arrOfStr[3] != null)
+                    }
+                    if (arrOfStr != null && arrOfStr[3] != null) {
+                        mCatsLongitudePrevious = mCatsLongitude;
                         mCatsLongitude = calculateLatLon(arrOfStr[3]);
+                    }
                 } else {
                     mString += character;
                     if (character.equals("$"))
@@ -279,10 +289,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
 
                 if (mCommandState == 3) {
-                    if (mChecksum == mChecksumSent)
-                        mCatGps.setText(Double.toString(mCatsLatitude) + " " + Double.toString(mCatsLongitude));
-                    else
-                        mCatGps.setText("Wrong checksum");
+                    if (mChecksum == mChecksumSent) {
+                        //if (mCatsLatitude != 0.0 && mCatsLongitude != 0.0)
+                            mCatGps.setText(Double.toString(mCatsLatitude) + " " + Double.toString(mCatsLongitude));
+                    } else {
+                        mCatsLatitude = mCatsLatitudePrevious;
+                        mCatsLongitude = mCatsLongitudePrevious;
+                        mCatGps.setText(Double.toString(mCatsLatitude) + " " + Double.toString(mCatsLongitude) + ". Wrong checksum");
+                    }
                     mCommandState = 0;
                     mString = "";
                 }
