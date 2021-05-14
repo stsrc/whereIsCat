@@ -64,8 +64,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private double mMyLongitude;
     private double mCatsLatitude;
     private double mCatsLongitude;
-    private double mCatsLatitudePrevious;
-    private double mCatsLongitudePrevious;
+    private double mCatsLatitudeProposition;
+    private double mCatsLongitudeProposition;
     private GPSTracker mGpsTracker;
     private int mCommandState;
     private String mString;
@@ -265,12 +265,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     mCommandState = 1;
                     String[] arrOfStr = mString.split(",", 0);
                     if (arrOfStr != null && arrOfStr[1] != null) {
-                        mCatsLatitudePrevious = mCatsLatitude;
-                        mCatsLatitude = calculateLatLon(arrOfStr[1]);
+                        mCatsLatitudeProposition = calculateLatLon(arrOfStr[1]);
                     }
                     if (arrOfStr != null && arrOfStr[3] != null) {
-                        mCatsLongitudePrevious = mCatsLongitude;
-                        mCatsLongitude = calculateLatLon(arrOfStr[3]);
+                        mCatsLongitudeProposition = calculateLatLon(arrOfStr[3]);
                     }
                 } else {
                     mString += character;
@@ -286,22 +284,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 int checksumPart =  Integer.valueOf(character, 16);
                 mChecksumSent = (char) ((mChecksumSent << 4) | checksumPart);
 
-
-
                 if (mCommandState == 3) {
                     if (mChecksum == mChecksumSent) {
-                        //if (mCatsLatitude != 0.0 && mCatsLongitude != 0.0)
-                            mCatGps.setText(Double.toString(mCatsLatitude) + " " + Double.toString(mCatsLongitude));
+                        mCatsLatitude = mCatsLatitudeProposition;
+                        mCatsLongitude = mCatsLongitudeProposition;
+                        mCatGps.setText(Double.toString(mCatsLatitude) + " " + Double.toString(mCatsLongitude));
                     } else {
-                        mCatsLatitude = mCatsLatitudePrevious;
-                        mCatsLongitude = mCatsLongitudePrevious;
                         mCatGps.setText(Double.toString(mCatsLatitude) + " " + Double.toString(mCatsLongitude) + ". Wrong checksum");
                     }
                     mCommandState = 0;
                     mString = "";
                 }
             }
-
         }
 
 
