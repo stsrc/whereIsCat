@@ -11,6 +11,8 @@ import android.bluetooth.le.ScanResult;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.preference.PreferenceManager;
@@ -35,6 +37,8 @@ public class BluetoothPairing<onSaveInstanceState> extends AppCompatActivity imp
     private ArrayList<BluetoothDevice> mLeDevices;
     private Button buttonOk;
     private RadioGroup mRadioGroupGps;
+    private RadioGroup mRadioGroupColors;
+    private int mColor;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,6 +50,7 @@ public class BluetoothPairing<onSaveInstanceState> extends AppCompatActivity imp
         buttonOk.setOnClickListener(BluetoothPairing.this);
         mRadioGroup = (RadioGroup) findViewById(R.id.radioGroup);
         mRadioGroupGps = (RadioGroup) findViewById(R.id.radioGroup3);
+        mRadioGroupColors = (RadioGroup) findViewById(R.id.radioGroup4);
         mTextView = findViewById(R.id.textView);
 
         RadioButton button = findViewById(R.id.radioButton3);
@@ -55,6 +60,31 @@ public class BluetoothPairing<onSaveInstanceState> extends AppCompatActivity imp
         } else {
             button.setChecked(false);
         }
+
+        RadioButton buttonColorsBlack = findViewById(R.id.radioButton4);
+        RadioButton buttonColorsWhite = findViewById(R.id.radioButton);
+
+        View view = findViewById(R.id.button2);
+        View root = view.getRootView();
+
+        if (sharedPreferences.getString( "Colors", "Black").equals("Black")) {
+            buttonColorsBlack.setChecked(true);
+            mColor = getResources().getColor(android.R.color.darker_gray);
+            root.setBackgroundColor(getResources().getColor(android.R.color.black));
+
+        } else {
+            buttonColorsBlack.setChecked(false);
+            mColor = getResources().getColor(android.R.color.black);
+            root.setBackgroundColor(getResources().getColor(android.R.color.white));
+        }
+
+        ((TextView) findViewById(R.id.textView)).setTextColor(mColor);
+        ((TextView) findViewById(R.id.textView10)).setTextColor(mColor);
+        ((TextView) findViewById(R.id.textView14)).setTextColor(mColor);
+        ((RadioButton) findViewById(R.id.radioButton2)).setTextColor(mColor);
+        ((RadioButton) findViewById(R.id.radioButton3)).setTextColor(mColor);
+        ((RadioButton) findViewById(R.id.radioButton)).setTextColor(mColor);
+        ((RadioButton) findViewById(R.id.radioButton4)).setTextColor(mColor);
 
         final BluetoothManager bluetoothManager =
                 (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
@@ -83,6 +113,20 @@ public class BluetoothPairing<onSaveInstanceState> extends AppCompatActivity imp
     private void addRadioButton(String text) {
         RadioButton button = new RadioButton(this);
         button.setText(text);
+        button.setTextColor(mColor);
+
+        ColorStateList colorList = new ColorStateList(
+                new int[][]{
+                        new int[]{-android.R.attr.state_enabled}, //disabled
+                        new int[]{android.R.attr.state_enabled} //enabled
+                },
+                new int[] {
+                        Color.BLACK //disabled
+                        ,Color.GRAY //enabled
+                }
+        );
+
+        button.setButtonTintList(colorList);
         mRadioGroup.addView(button);
     }
 
@@ -108,8 +152,10 @@ public class BluetoothPairing<onSaveInstanceState> extends AppCompatActivity imp
             case R.id.button3:
                 int selectedId = mRadioGroup.getCheckedRadioButtonId();
                 int selectedGpsId = mRadioGroupGps.getCheckedRadioButtonId();
+                int selectedColorsId = mRadioGroupColors.getCheckedRadioButtonId();
                 RadioButton selectedButton = (RadioButton) findViewById(selectedId);
                 RadioButton selectedGpsButton = (RadioButton) findViewById(selectedGpsId);
+                RadioButton selectedColorsButton = (RadioButton) findViewById(selectedColorsId);
 
                 if (selectedButton != null) {
                     CharSequence buttonText = selectedButton.getText();
@@ -123,10 +169,9 @@ public class BluetoothPairing<onSaveInstanceState> extends AppCompatActivity imp
                     }
                 }
 
+                SharedPreferences sharedPreferences = getSharedPreferences("where-is-cat", MODE_PRIVATE);
+                SharedPreferences.Editor shEditor = sharedPreferences.edit();
                 if (selectedGpsButton != null) {
-                    SharedPreferences sharedPreferences = getSharedPreferences("where-is-cat", MODE_PRIVATE);
-                    SharedPreferences.Editor shEditor = sharedPreferences.edit();
-
                     CharSequence text = selectedGpsButton.getText();
                     if (text.equals("Network")) {
                         intent.putExtra("realgps", false);
@@ -135,10 +180,16 @@ public class BluetoothPairing<onSaveInstanceState> extends AppCompatActivity imp
                         intent.putExtra("realgps", true);
                         shEditor.putBoolean("gps", true);
                     }
-                    shEditor.commit();
+
                 }
 
+                if (selectedColorsButton != null) {
+                    intent.putExtra("Colors",  (String) selectedColorsButton.getText());
+                    shEditor.putString("Colors", (String) selectedColorsButton.getText());
+                }
+                shEditor.commit();
             default:
+
         }
         startActivity(intent);
     }

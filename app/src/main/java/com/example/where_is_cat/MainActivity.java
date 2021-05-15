@@ -18,6 +18,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -71,6 +72,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private String mString;
     private char mChecksum;
     private char mChecksumSent;
+    private String mColor;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         Log.d("---> <---", "onCreate()");
@@ -190,6 +192,33 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 mBluetoothDevice = intent.getParcelableExtra("bluetooth");
                 mBluetoothTextView.setText(mBluetoothDevice.getAddress() + " " + mBluetoothDevice.getName());
                 mBluetoothGatt = mBluetoothDevice.connectGatt(this, true, gattCallback);
+            }
+
+            if (extras != null && extras.containsKey("Colors")) {
+                mColor = extras.getString("Colors");
+                View view = findViewById(R.id.imageView);
+                View root = view.getRootView();
+                int color;
+                if (mColor.equals("Black")) {
+                    root.setBackgroundColor(getResources().getColor(android.R.color.black));
+                    color = getResources().getColor(android.R.color.darker_gray);
+                    mArrow.setColorFilter(Color.argb(0, 0, 0, 0));
+                } else {
+                    root.setBackgroundColor(getResources().getColor(android.R.color.white));
+                    color = getResources().getColor(android.R.color.black);
+                    mArrow.setColorFilter(Color.argb(255,0,0,0));
+                }
+                mDistance.setTextColor(color);
+                ((TextView) findViewById(R.id.myTextView)).setTextColor(color);
+                ((TextView) findViewById(R.id.textView4)).setTextColor(color);
+                ((TextView) findViewById(R.id.textView2)).setTextColor(color);
+                ((TextView) findViewById(R.id.textView3)).setTextColor(color);
+                ((TextView) findViewById(R.id.textView5)).setTextColor(color);
+                ((TextView) findViewById(R.id.textView6)).setTextColor(color);
+                ((TextView) findViewById(R.id.textView7)).setTextColor(color);
+                ((TextView) findViewById(R.id.textView8)).setTextColor(color);
+                ((TextView) findViewById(R.id.textView9)).setTextColor(color);
+                ((TextView) findViewById(R.id.textView12)).setTextColor(color);
             }
         }
 
